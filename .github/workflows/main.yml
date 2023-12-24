@@ -1,5 +1,18 @@
 name: CI_CD WORKFOLWS
-on: push
+
+env:
+  SERVER_USER: "root"
+  SERVER_STAGING: "78.138.45.88"
+  SERVER_PRODUCTION: "162.19.228.83"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
 
 jobs:
 
@@ -107,3 +120,24 @@ jobs:
         run: docker compose up --exit-code-from cypress --abort-on-container-exit
       - name: Nettoyage
         run: docker compose down -v --remove-orphans
+
+  deploy_production:
+    needs: [ e2e ]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: http://${{ env.SERVER_PRODUCTION }}
+    steps:
+      - name: checkout le code
+        uses: actions/checkout@v4
+
+      - name: déployer sur le serveur de production
+        run: |
+          eval $(ssh-agent -s)
+          ssh-add - <<< "${{ secrets.OVH_PROD_PKEY }}"
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ env.SERVER_PRODUCTION }} >> ~/.ssh/known_hosts
+          scp -r docker-compose.prod.yml ${{ env.SERVER_USER }}@${{ env.SERVER_PRODUCTION }}:/root/docker-compose.prod.yml
+          ssh ${{ env.SERVER_USER }}@${{ env.SERVER_PRODUCTION }} "docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} &&
+            docker compose -f /root/docker-compose.prod.yml up -d --force-recreate"
