@@ -29,8 +29,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ${{matrix.context_name}}
+          context: ${{ matrix.context_name }}
           push: true
-          tags: ${{matrix.image_name}}
+          tags: ${{ matrix.image_name }}
           cache-on: --type=gha # Cache pour le gitHub action
           cache-from: --type=gha,mode=max # Cache tout, mm les layers intermédiare
